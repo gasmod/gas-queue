@@ -78,6 +78,27 @@ func setupLocalStackOnce(t *testing.T) string {
 	return lsEndpoint
 }
 
+// newSQSClient creates an SQS client pointed at the given endpoint with
+// dummy credentials. LocalStack does not validate credentials.
+func newSQSClient(t *testing.T, endpoint string) *awssqs.Client {
+	t.Helper()
+	ctx := context.Background()
+	cfg, err := awsconfig.LoadDefaultConfig(ctx,
+		awsconfig.WithRegion("us-east-1"),
+		awsconfig.WithCredentialsProvider(aws.CredentialsProviderFunc(
+			func(context.Context) (aws.Credentials, error) {
+				return aws.Credentials{AccessKeyID: "test", SecretAccessKey: "test"}, nil
+			},
+		)),
+	)
+	if err != nil {
+		t.Fatalf("load aws config: %v", err)
+	}
+	return awssqs.NewFromConfig(cfg, func(o *awssqs.Options) {
+		o.BaseEndpoint = aws.String(endpoint)
+	})
+}
+
 func uniqueQueue(t *testing.T, endpoint string) string {
 	t.Helper()
 	queueSeqMu.Lock()
@@ -91,24 +112,8 @@ func uniqueQueue(t *testing.T, endpoint string) string {
 		name = name[:80]
 	}
 
-	ctx := context.Background()
-	cfg, err := awsconfig.LoadDefaultConfig(ctx,
-		awsconfig.WithRegion("us-east-1"),
-		awsconfig.WithCredentialsProvider(aws.CredentialsProviderFunc(
-			func(context.Context) (aws.Credentials, error) {
-				return aws.Credentials{AccessKeyID: "test", SecretAccessKey: "test"}, nil
-			},
-		)),
-	)
-	if err != nil {
-		t.Fatalf("load aws config: %v", err)
-	}
-
-	client := awssqs.NewFromConfig(cfg, func(o *awssqs.Options) {
-		o.BaseEndpoint = aws.String(endpoint)
-	})
-
-	out, err := client.CreateQueue(ctx, &awssqs.CreateQueueInput{
+	client := newSQSClient(t, endpoint)
+	out, err := client.CreateQueue(context.Background(), &awssqs.CreateQueueInput{
 		QueueName: aws.String(name),
 	})
 	if err != nil {
@@ -124,24 +129,8 @@ func uniqueFIFOQueue(t *testing.T, endpoint string) string {
 	name := fmt.Sprintf("test-%d.fifo", queueSeq)
 	queueSeqMu.Unlock()
 
-	ctx := context.Background()
-	cfg, err := awsconfig.LoadDefaultConfig(ctx,
-		awsconfig.WithRegion("us-east-1"),
-		awsconfig.WithCredentialsProvider(aws.CredentialsProviderFunc(
-			func(context.Context) (aws.Credentials, error) {
-				return aws.Credentials{AccessKeyID: "test", SecretAccessKey: "test"}, nil
-			},
-		)),
-	)
-	if err != nil {
-		t.Fatalf("load aws config: %v", err)
-	}
-
-	client := awssqs.NewFromConfig(cfg, func(o *awssqs.Options) {
-		o.BaseEndpoint = aws.String(endpoint)
-	})
-
-	out, err := client.CreateQueue(ctx, &awssqs.CreateQueueInput{
+	client := newSQSClient(t, endpoint)
+	out, err := client.CreateQueue(context.Background(), &awssqs.CreateQueueInput{
 		QueueName: aws.String(name),
 		Attributes: map[string]string{
 			"FifoQueue":                 "true",
@@ -163,7 +152,8 @@ func newIntegrationService(t *testing.T, endpoint string) *Service {
 	cfg.Queue.WaitTimeSeconds = 1
 	cfg.Queue.VisibilityTimeout = 5 * time.Second
 
-	ctor := New(WithConfig(cfg))
+	client := newSQSClient(t, endpoint)
+	ctor := New(WithConfig(cfg), WithClient(client))
 	svc := ctor(nil, gas.NewNopLogger()())
 	if err := svc.Init(); err != nil {
 		t.Fatalf("init: %v", err)
