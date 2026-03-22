@@ -1,0 +1,161 @@
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+  tests: false
+
+linters:
+  enable:
+    # Bugs & correctness
+    - errcheck
+    - govet
+    - staticcheck
+    - bodyclose
+    - nilerr
+    - sqlclosecheck
+    - contextcheck
+
+    # Style & consistency
+    - revive
+    - misspell
+    - whitespace
+    - unconvert
+    - predeclared
+
+    # Complexity & maintainability
+    - gocyclo
+    - gocognit
+    - cyclop
+    - funlen
+    - nestif
+
+    # Performance
+    - prealloc
+    - gocritic
+
+    # Security
+    - gosec
+
+    # Error handling
+    - errorlint
+    - wrapcheck
+
+    # Unused code
+    - unused
+    - unparam
+    - wastedassign
+
+  settings:
+    gocyclo:
+      min-complexity: 15
+
+    gocognit:
+      min-complexity: 30
+
+    cyclop:
+      max-complexity: 15
+
+    funlen:
+      lines: 80
+      statements: 50
+      ignore-comments: true
+
+    nestif:
+      min-complexity: 5
+
+    govet:
+      enable-all: true
+
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: exported
+        - name: if-return
+        - name: increment-decrement
+        - name: var-naming
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unreachable-code
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - hugeParam
+
+    gosec:
+      excludes:
+        - G104
+        - G304
+
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
+
+    wrapcheck:
+      ignore-sigs:
+        - .Errorf(
+        - errors.New(
+        - errors.Unwrap(
+        - errors.Join(
+        - .Wrap(
+        - .Wrapf(
+        - .WithMessage(
+        - .WithMessagef(
+        - .WithStack(
+      ignore-package-globs:
+        - encoding/*
+        - github.com/go-chi/*
+
+    misspell:
+      locale: US
+
+  exclusions:
+    rules:
+      # Test files get relaxed rules
+      - path: _test\.go
+        linters:
+          - funlen
+          - gocyclo
+          - gocognit
+          - wrapcheck
+          - gosec
+          - errcheck
+
+      # Main files can be slightly longer
+      - path: cmd/
+        linters:
+          - funlen
+
+      # Migration files
+      - path: migrations/
+        linters:
+          - wrapcheck
+          - errcheck
+
+    paths:
+      - vendor
+      - third_party
+      - testdata
+
+output:
+  sort-order:
+    - linter
+    - severity
+    - file
