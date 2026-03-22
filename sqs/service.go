@@ -3,6 +3,7 @@ package sqs
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync/atomic"
 	"time"
 
@@ -187,25 +188,16 @@ func (s *Service) Dequeue(ctx context.Context, queueURL string, maxMessages int,
 		return nil, queue.ErrClosed
 	}
 
-	// Clamp maxMessages to SQS limits (1-10).
-	if maxMessages < 1 {
-		maxMessages = 1
-	}
-	if maxMessages > 10 {
-		s.logger.Warn("maxMessages clamped to 10 (SQS limit)").Int("requested", maxMessages).Send()
-		maxMessages = 10
-	}
-
-	waitSeconds := int32(wait.Seconds()) //nolint:gosec // clamped to 0-20 by Validate
-	if waitSeconds == 0 {
-		waitSeconds = int32(s.cfg.Queue.WaitTimeSeconds) //nolint:gosec // clamped to 0-20 by Validate
+	maxNumMessages, waitSeconds, visibilityTimeout, err := s.receiveMessageParams(maxMessages, wait)
+	if err != nil {
+		return nil, err
 	}
 
 	input := &awssqs.ReceiveMessageInput{
 		QueueUrl:                    &queueURL,
-		MaxNumberOfMessages:         int32(maxMessages),
+		MaxNumberOfMessages:         maxNumMessages,
 		WaitTimeSeconds:             waitSeconds,
-		VisibilityTimeout:           int32(s.cfg.Queue.VisibilityTimeout.Seconds()),
+		VisibilityTimeout:           visibilityTimeout,
 		MessageAttributeNames:       []string{"All"},
 		MessageSystemAttributeNames: []types.MessageSystemAttributeName{types.MessageSystemAttributeNameAll},
 	}
@@ -242,6 +234,45 @@ func (s *Service) Dequeue(ctx context.Context, queueURL string, maxMessages int,
 	return jobs, nil
 }
 
+func (s *Service) receiveMessageParams(maxMessages int, wait time.Duration) (maxNumMessages, waitSeconds, visibilityTimeout int32, err error) {
+	// Clamp maxMessages to SQS limits (1-10).
+	if maxMessages < 1 {
+		maxMessages = 1
+	}
+	if maxMessages > 10 {
+		s.logger.Warn("maxMessages clamped to 10 (SQS limit)").Int("requested", maxMessages).Send()
+		maxMessages = 10
+	}
+
+	waitSeconds, err = safeInt32(wait.Seconds())
+	if err != nil {
+		err = fmt.Errorf("invalid wait duration: %w", err)
+		return
+	}
+
+	if waitSeconds == 0 {
+		waitSeconds, err = safeInt32(s.cfg.Queue.WaitTimeSeconds)
+		if err != nil {
+			err = fmt.Errorf("invalid wait time: %w", err)
+			return
+		}
+	}
+
+	maxNumMessages, err = safeInt32(maxMessages)
+	if err != nil {
+		err = fmt.Errorf("invalid maxMessages: %w", err)
+		return
+	}
+
+	visibilityTimeout, err = safeInt32(s.cfg.Queue.VisibilityTimeout.Seconds())
+	if err != nil {
+		err = fmt.Errorf("invalid visibility timeout: %w", err)
+		return
+	}
+
+	return
+}
+
 // Ack acknowledges a job by deleting it from the queue.
 func (s *Service) Ack(ctx context.Context, queueURL string, job gas.Job) error {
 	if s.closed.Load() {
@@ -274,4 +305,12 @@ func (s *Service) Nack(ctx context.Context, queueURL string, job gas.Job) error 
 		return fmt.Errorf("%s: nack: %w", s.Name(), err)
 	}
 	return nil
+}
+
+// safeInt32 converts an int/float to int32, returning an error if the value overflows the range of int32.
+func safeInt32[T int | int32 | int64 | float32 | float64](n T) (int32, error) {
+	if n > math.MaxInt32 || n < math.MinInt32 {
+		return 0, fmt.Errorf("safeInt32: value %v overflows int32", n)
+	}
+	return int32(n), nil
 }
