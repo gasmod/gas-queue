@@ -16,7 +16,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.41.4
 	github.com/aws/aws-sdk-go-v2/config v1.32.12
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.42.24
-	github.com/gasmod/gas v0.2.14
+	github.com/gasmod/gas v0.2.16
 	github.com/gasmod/gas-config v0.2.1
 	github.com/testcontainers/testcontainers-go v0.41.0
 )
