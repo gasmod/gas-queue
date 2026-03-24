@@ -8,7 +8,7 @@ description: >
   sub-package, queuetest mock, gas.JobQueueProvider implementation, sentinel
   errors, DI wiring, configuration binding, enqueue options (delay, FIFO group,
   deduplication, attributes), dequeue with long-polling, ack/nack semantics,
-  and custom endpoint support for LocalStack. Make sure to use this skill
+  and custom endpoint support for ElasticMQ. Make sure to use this skill
   whenever working with job queues in the Gas ecosystem, even if the user
   doesn't explicitly mention gas-queue — any code that imports gasmod/gas-queue
   or references gas.JobQueueProvider should trigger this skill.
@@ -29,7 +29,7 @@ import "github.com/gasmod/gas-queue/queuetest"
 
 | Backend | Package          | Service name    | Use case                          |
 |---------|------------------|-----------------|-----------------------------------|
-| SQS     | `gas-queue/sqs`  | `gas-queue-sqs` | Production (AWS SQS / LocalStack) |
+| SQS     | `gas-queue/sqs`  | `gas-queue-sqs` | Production (AWS SQS / ElasticMQ) |
 
 The SQS backend implements `gas.Service` and `gas.JobQueueProvider`.
 
@@ -130,7 +130,7 @@ type Config struct {
 
 type Settings struct {
     Region            string        // default "us-east-1"
-    Endpoint          string        // optional custom endpoint (e.g. LocalStack)
+    Endpoint          string        // optional custom endpoint (e.g. ElasticMQ)
     VisibilityTimeout time.Duration // default 30s
     WaitTimeSeconds   int           // 0-20, default 20
 }
@@ -186,7 +186,7 @@ app := gas.NewApp(
         queuesqs.New(queuesqs.WithConfig(&queuesqs.Config{
             Queue: queuesqs.Settings{
                 Region:   "eu-west-1",
-                Endpoint: "http://localhost:4566",
+                Endpoint: "http://localhost:9324",
             },
         })),
     ),

@@ -20,48 +20,47 @@ import (
 
 // shared across all integration tests — one container per test run.
 var (
-	lsEndpoint  string
-	lsCleanup   func()
-	lsReady     sync.Once
-	lsSetupErr  error
+	sqsEndpoint string
+	sqsCleanup  func()
+	sqsReady    sync.Once
+	sqsSetupErr error
 	queueSeq    int
 	queueSeqMu  sync.Mutex
 )
 
-func setupLocalStackOnce(t *testing.T) string {
+func setupElasticMQOnce(t *testing.T) string {
 	t.Helper()
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	lsReady.Do(func() {
+	sqsReady.Do(func() {
 		ctx := context.Background()
 		req := testcontainers.ContainerRequest{
-			Image:        "localstack/localstack:latest",
-			ExposedPorts: []string{"4566/tcp"},
-			Env:          map[string]string{"SERVICES": "sqs"},
-			WaitingFor:   wait.ForHTTP("/_localstack/health").WithPort("4566/tcp").WithStartupTimeout(60 * time.Second),
+			Image:        "softwaremill/elasticmq-native:latest",
+			ExposedPorts: []string{"9324/tcp"},
+			WaitingFor:   wait.ForListeningPort("9324/tcp").WithStartupTimeout(60 * time.Second),
 		}
 		container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 			ContainerRequest: req,
 			Started:          true,
 		})
 		if err != nil {
-			lsSetupErr = fmt.Errorf("start localstack: %w", err)
+			sqsSetupErr = fmt.Errorf("start elasticmq: %w", err)
 			return
 		}
 		host, err := container.Host(ctx)
 		if err != nil {
-			lsSetupErr = fmt.Errorf("get host: %w", err)
+			sqsSetupErr = fmt.Errorf("get host: %w", err)
 			return
 		}
-		port, err := container.MappedPort(ctx, "4566")
+		port, err := container.MappedPort(ctx, "9324")
 		if err != nil {
-			lsSetupErr = fmt.Errorf("get port: %w", err)
+			sqsSetupErr = fmt.Errorf("get port: %w", err)
 			return
 		}
-		lsEndpoint = fmt.Sprintf("http://%s:%s", host, port.Port())
-		lsCleanup = func() {
+		sqsEndpoint = fmt.Sprintf("http://%s:%s", host, port.Port())
+		sqsCleanup = func() {
 			if err := container.Terminate(ctx); err != nil {
 				// best-effort
 				_ = err
@@ -69,17 +68,17 @@ func setupLocalStackOnce(t *testing.T) string {
 		}
 	})
 
-	if lsSetupErr != nil {
-		t.Fatalf("localstack: %v", lsSetupErr)
+	if sqsSetupErr != nil {
+		t.Fatalf("elasticmq: %v", sqsSetupErr)
 	}
 	t.Cleanup(func() {
-		// lsCleanup is called only once, managed externally
+		// sqsCleanup is called only once, managed externally
 	})
-	return lsEndpoint
+	return sqsEndpoint
 }
 
 // newSQSClient creates an SQS client pointed at the given endpoint with
-// dummy credentials. LocalStack does not validate credentials.
+// dummy credentials. ElasticMQ does not validate credentials.
 func newSQSClient(t *testing.T, endpoint string) *awssqs.Client {
 	t.Helper()
 	ctx := context.Background()
@@ -165,7 +164,7 @@ func newIntegrationService(t *testing.T, endpoint string) *Service {
 // --- basic round-trip ---
 
 func TestIntegration_EnqueueDequeue(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	queueURL := uniqueQueue(t, endpoint)
 	svc := newIntegrationService(t, endpoint)
 	ctx := context.Background()
@@ -198,7 +197,7 @@ func TestIntegration_EnqueueDequeue(t *testing.T) {
 // --- ack removes message permanently ---
 
 func TestIntegration_Ack(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	queueURL := uniqueQueue(t, endpoint)
 	svc := newIntegrationService(t, endpoint)
 	ctx := context.Background()
@@ -231,7 +230,7 @@ func TestIntegration_Ack(t *testing.T) {
 // --- nack makes message immediately re-deliverable ---
 
 func TestIntegration_Nack(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	queueURL := uniqueQueue(t, endpoint)
 	svc := newIntegrationService(t, endpoint)
 	ctx := context.Background()
@@ -267,7 +266,7 @@ func TestIntegration_Nack(t *testing.T) {
 // --- custom message attributes survive round-trip ---
 
 func TestIntegration_MessageAttributes(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	queueURL := uniqueQueue(t, endpoint)
 	svc := newIntegrationService(t, endpoint)
 	ctx := context.Background()
@@ -295,7 +294,7 @@ func TestIntegration_MessageAttributes(t *testing.T) {
 // --- closed service returns sentinel error ---
 
 func TestIntegration_Close(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	queueURL := uniqueQueue(t, endpoint)
 
 	cfg := DefaultConfig()
@@ -331,7 +330,7 @@ func TestIntegration_Close(t *testing.T) {
 // --- batch: enqueue many, dequeue in batches, verify all arrive ---
 
 func TestIntegration_BatchDequeue(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	queueURL := uniqueQueue(t, endpoint)
 	svc := newIntegrationService(t, endpoint)
 	ctx := context.Background()
@@ -376,7 +375,7 @@ func TestIntegration_BatchDequeue(t *testing.T) {
 // --- delay: message with DelaySeconds should not be immediately visible ---
 
 func TestIntegration_DelaySeconds(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	queueURL := uniqueQueue(t, endpoint)
 	svc := newIntegrationService(t, endpoint)
 	ctx := context.Background()
@@ -412,7 +411,7 @@ func TestIntegration_DelaySeconds(t *testing.T) {
 // --- double ack: second ack on same receipt handle should error ---
 
 func TestIntegration_DoubleAck(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	queueURL := uniqueQueue(t, endpoint)
 	svc := newIntegrationService(t, endpoint)
 	ctx := context.Background()
@@ -433,17 +432,18 @@ func TestIntegration_DoubleAck(t *testing.T) {
 		t.Fatalf("first Ack: %v", err)
 	}
 
-	// SQS silently accepts duplicate deletes — this should NOT error.
-	// Verify the service doesn't break on the second call.
+	// SQS silently accepts duplicate deletes; ElasticMQ rejects them
+	// with ReceiptHandleIsInvalid. Both behaviors are acceptable — the
+	// important thing is the service doesn't panic or corrupt state.
 	if err := svc.Ack(ctx, queueURL, jobs[0]); err != nil {
-		t.Errorf("second Ack unexpectedly failed: %v", err)
+		t.Logf("second Ack returned error (expected on ElasticMQ): %v", err)
 	}
 }
 
 // --- empty queue returns zero jobs, not an error ---
 
 func TestIntegration_DequeueEmpty(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	queueURL := uniqueQueue(t, endpoint)
 	svc := newIntegrationService(t, endpoint)
 	ctx := context.Background()
@@ -460,7 +460,7 @@ func TestIntegration_DequeueEmpty(t *testing.T) {
 // --- large payload near SQS 256KB limit ---
 
 func TestIntegration_LargePayload(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	queueURL := uniqueQueue(t, endpoint)
 	svc := newIntegrationService(t, endpoint)
 	ctx := context.Background()
@@ -484,11 +484,11 @@ func TestIntegration_LargePayload(t *testing.T) {
 }
 
 // --- oversized payload should be rejected by SQS ---
-// NOTE: LocalStack does not enforce the 256KB message size limit.
+// NOTE: ElasticMQ does not enforce the 256KB message size limit.
 // This test documents the expected behavior against real SQS.
 
 func TestIntegration_OversizedPayload(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	queueURL := uniqueQueue(t, endpoint)
 	svc := newIntegrationService(t, endpoint)
 	ctx := context.Background()
@@ -497,20 +497,20 @@ func TestIntegration_OversizedPayload(t *testing.T) {
 	payload := []byte(strings.Repeat("X", 300*1024))
 	err := svc.Enqueue(ctx, queueURL, payload)
 
-	// Real SQS rejects this; LocalStack accepts it.
+	// Real SQS rejects this; ElasticMQ accepts it.
 	// We log the behavior rather than hard-failing so the test is
 	// informative in both environments.
 	if err != nil {
 		t.Logf("oversized payload rejected (expected on real SQS): %v", err)
 	} else {
-		t.Log("oversized payload accepted (LocalStack does not enforce 256KB limit)")
+		t.Log("oversized payload accepted (ElasticMQ does not enforce 256KB limit)")
 	}
 }
 
 // --- empty body ---
 
 func TestIntegration_EmptyBody(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	queueURL := uniqueQueue(t, endpoint)
 	svc := newIntegrationService(t, endpoint)
 	ctx := context.Background()
@@ -525,7 +525,7 @@ func TestIntegration_EmptyBody(t *testing.T) {
 // --- concurrent producers ---
 
 func TestIntegration_ConcurrentEnqueue(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	queueURL := uniqueQueue(t, endpoint)
 	svc := newIntegrationService(t, endpoint)
 	ctx := context.Background()
@@ -581,7 +581,7 @@ func TestIntegration_ConcurrentEnqueue(t *testing.T) {
 // --- FIFO queue: ordering + deduplication ---
 
 func TestIntegration_FIFOQueue(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	queueURL := uniqueFIFOQueue(t, endpoint)
 	svc := newIntegrationService(t, endpoint)
 	ctx := context.Background()
@@ -630,7 +630,7 @@ func TestIntegration_FIFOQueue(t *testing.T) {
 // --- FIFO deduplication: same deduplication ID should be silently dropped ---
 
 func TestIntegration_FIFODeduplication(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	queueURL := uniqueFIFOQueue(t, endpoint)
 	svc := newIntegrationService(t, endpoint)
 	ctx := context.Background()
@@ -672,7 +672,7 @@ func TestIntegration_FIFODeduplication(t *testing.T) {
 // --- system attributes (e.g. SentTimestamp) are populated ---
 
 func TestIntegration_SystemAttributes(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	queueURL := uniqueQueue(t, endpoint)
 	svc := newIntegrationService(t, endpoint)
 	ctx := context.Background()
@@ -709,7 +709,7 @@ func TestIntegration_SystemAttributes(t *testing.T) {
 // --- context cancellation ---
 
 func TestIntegration_ContextCancelled(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	queueURL := uniqueQueue(t, endpoint)
 	svc := newIntegrationService(t, endpoint)
 
@@ -730,7 +730,7 @@ func TestIntegration_ContextCancelled(t *testing.T) {
 // --- nack then ack: full retry cycle ---
 
 func TestIntegration_NackThenAck(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	queueURL := uniqueQueue(t, endpoint)
 	svc := newIntegrationService(t, endpoint)
 	ctx := context.Background()
@@ -779,7 +779,7 @@ func TestIntegration_NackThenAck(t *testing.T) {
 // --- Client() returns a usable *sqs.Client for advanced ops ---
 
 func TestIntegration_ClientAccessor(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	svc := newIntegrationService(t, endpoint)
 
 	client := svc.Client()
@@ -787,7 +787,7 @@ func TestIntegration_ClientAccessor(t *testing.T) {
 		t.Fatal("Client() returned nil")
 	}
 
-	// Use it to create a queue directly — proves it's wired to LocalStack.
+	// Use it to create a queue directly — proves it's wired to ElasticMQ.
 	out, err := client.CreateQueue(context.Background(), &awssqs.CreateQueueInput{
 		QueueName: aws.String("client-accessor-test"),
 	})
@@ -802,7 +802,7 @@ func TestIntegration_ClientAccessor(t *testing.T) {
 // --- special characters in payload ---
 
 func TestIntegration_SpecialCharPayload(t *testing.T) {
-	endpoint := setupLocalStackOnce(t)
+	endpoint := setupElasticMQOnce(t)
 	queueURL := uniqueQueue(t, endpoint)
 	svc := newIntegrationService(t, endpoint)
 	ctx := context.Background()

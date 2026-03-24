@@ -13,7 +13,7 @@ go get github.com/gasmod/gas-queue
 
 | Backend | Package                           | Use case                          |
 |---------|-----------------------------------|-----------------------------------|
-| SQS     | `github.com/gasmod/gas-queue/sqs` | Production (AWS SQS / LocalStack) |
+| SQS     | `github.com/gasmod/gas-queue/sqs` | Production (AWS SQS / ElasticMQ) |
 
 The SQS backend implements `gas.Service` and `gas.JobQueueProvider`.
 
@@ -44,7 +44,7 @@ With custom configuration:
 ```go
 cfg := queuesqs.DefaultConfig()
 cfg.Queue.Region = "eu-west-1"
-cfg.Queue.Endpoint = "http://localhost:4566" // LocalStack
+cfg.Queue.Endpoint = "http://localhost:9324" // ElasticMQ
 
 queuesqs.New(queuesqs.WithConfig(cfg))
 ```
@@ -116,7 +116,7 @@ via DI. This lets you drive queue settings from environment variables or a confi
 | Field                     | Default     | Description                                                    |
 |---------------------------|-------------|----------------------------------------------------------------|
 | `Queue.Region`            | `us-east-1` | AWS region                                                     |
-| `Queue.Endpoint`          |             | Custom endpoint URL (e.g. LocalStack); empty = default AWS     |
+| `Queue.Endpoint`          |             | Custom endpoint URL (e.g. ElasticMQ); empty = default AWS      |
 | `Queue.VisibilityTimeout` | `30s`       | How long a dequeued message stays invisible to other consumers |
 | `Queue.WaitTimeSeconds`   | `20`        | Long-poll duration for ReceiveMessage (0-20, SQS hard limit)   |
 
