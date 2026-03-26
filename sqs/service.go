@@ -12,6 +12,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	awssqs "github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
@@ -119,6 +120,16 @@ func (s *Service) Init() error {
 func (s *Service) createClient() error {
 	opts := []func(*awsconfig.LoadOptions) error{
 		awsconfig.WithRegion(s.cfg.Queue.Region),
+	}
+
+	if s.cfg.Queue.AccessKeyID != "" && s.cfg.Queue.SecretAccessKey != "" {
+		opts = append(opts, awsconfig.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(
+				s.cfg.Queue.AccessKeyID,
+				s.cfg.Queue.SecretAccessKey,
+				"",
+			),
+		))
 	}
 
 	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(), opts...)

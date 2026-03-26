@@ -29,6 +29,14 @@ type Settings struct {
 	// Empty means use the default AWS endpoint.
 	Endpoint string
 
+	// AccessKeyID is the AWS access key ID for static credentials.
+	// If empty, the default AWS credential chain is used.
+	AccessKeyID string
+
+	// SecretAccessKey is the AWS secret access key for static credentials.
+	// If empty, the default AWS credential chain is used.
+	SecretAccessKey string
+
 	// VisibilityTimeout is how long a dequeued message stays invisible
 	// to other consumers. SQS max is 12 hours.
 	VisibilityTimeout time.Duration
