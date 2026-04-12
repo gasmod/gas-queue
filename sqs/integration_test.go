@@ -94,7 +94,7 @@ func newSQSClient(t *testing.T, endpoint string) *awssqs.Client {
 		t.Fatalf("load aws config: %v", err)
 	}
 	return awssqs.NewFromConfig(cfg, func(o *awssqs.Options) {
-		o.BaseEndpoint = aws.String(endpoint)
+		o.BaseEndpoint = new(endpoint)
 	})
 }
 
@@ -113,7 +113,7 @@ func uniqueQueue(t *testing.T, endpoint string) string {
 
 	client := newSQSClient(t, endpoint)
 	out, err := client.CreateQueue(context.Background(), &awssqs.CreateQueueInput{
-		QueueName: aws.String(name),
+		QueueName: new(name),
 	})
 	if err != nil {
 		t.Fatalf("create queue %q: %v", name, err)
@@ -130,7 +130,7 @@ func uniqueFIFOQueue(t *testing.T, endpoint string) string {
 
 	client := newSQSClient(t, endpoint)
 	out, err := client.CreateQueue(context.Background(), &awssqs.CreateQueueInput{
-		QueueName: aws.String(name),
+		QueueName: new(name),
 		Attributes: map[string]string{
 			"FifoQueue":                 "true",
 			"ContentBasedDeduplication": "false",
@@ -789,7 +789,7 @@ func TestIntegration_ClientAccessor(t *testing.T) {
 
 	// Use it to create a queue directly — proves it's wired to ElasticMQ.
 	out, err := client.CreateQueue(context.Background(), &awssqs.CreateQueueInput{
-		QueueName: aws.String("client-accessor-test"),
+		QueueName: new("client-accessor-test"),
 	})
 	if err != nil {
 		t.Fatalf("CreateQueue via Client(): %v", err)

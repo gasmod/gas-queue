@@ -49,8 +49,6 @@ func newTestService(t *testing.T, mock *mockSQSClient) *Service {
 	return svc
 }
 
-func ptr(s string) *string { return &s }
-
 // --- config tests ---
 
 func TestDefaultConfig(t *testing.T) {
@@ -105,7 +103,7 @@ func TestEnqueue(t *testing.T) {
 	mock := &mockSQSClient{
 		sendMessageFn: func(_ context.Context, params *awssqs.SendMessageInput, _ ...func(*awssqs.Options)) (*awssqs.SendMessageOutput, error) {
 			captured = params
-			return &awssqs.SendMessageOutput{MessageId: ptr("msg-1")}, nil
+			return &awssqs.SendMessageOutput{MessageId: new("msg-1")}, nil
 		},
 	}
 
@@ -130,7 +128,7 @@ func TestEnqueueWithOptions(t *testing.T) {
 	mock := &mockSQSClient{
 		sendMessageFn: func(_ context.Context, params *awssqs.SendMessageInput, _ ...func(*awssqs.Options)) (*awssqs.SendMessageOutput, error) {
 			captured = params
-			return &awssqs.SendMessageOutput{MessageId: ptr("msg-2")}, nil
+			return &awssqs.SendMessageOutput{MessageId: new("msg-2")}, nil
 		},
 	}
 
@@ -185,11 +183,11 @@ func TestDequeue(t *testing.T) {
 			return &awssqs.ReceiveMessageOutput{
 				Messages: []types.Message{
 					{
-						MessageId:     ptr("id-1"),
-						ReceiptHandle: ptr("rh-1"),
-						Body:          ptr(`{"job":1}`),
+						MessageId:     new("id-1"),
+						ReceiptHandle: new("rh-1"),
+						Body:          new(`{"job":1}`),
 						MessageAttributes: map[string]types.MessageAttributeValue{
-							"priority": {StringValue: ptr("high")},
+							"priority": {StringValue: new("high")},
 						},
 					},
 				},

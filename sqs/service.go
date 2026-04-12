@@ -140,7 +140,7 @@ func (s *Service) createClient() error {
 	var sqsOpts []func(*awssqs.Options)
 	if s.cfg.Queue.Endpoint != "" {
 		sqsOpts = append(sqsOpts, func(o *awssqs.Options) {
-			o.BaseEndpoint = aws.String(s.cfg.Queue.Endpoint)
+			o.BaseEndpoint = new(s.cfg.Queue.Endpoint)
 		})
 	}
 
@@ -165,7 +165,7 @@ func (s *Service) Enqueue(ctx context.Context, queueURL string, payload []byte, 
 
 	input := &awssqs.SendMessageInput{
 		QueueUrl:    &queueURL,
-		MessageBody: aws.String(string(payload)),
+		MessageBody: new(string(payload)),
 	}
 
 	if delay > 0 {
@@ -181,8 +181,8 @@ func (s *Service) Enqueue(ctx context.Context, queueURL string, payload []byte, 
 		input.MessageAttributes = make(map[string]types.MessageAttributeValue, len(attrs))
 		for k, v := range attrs {
 			input.MessageAttributes[k] = types.MessageAttributeValue{
-				DataType:    aws.String("String"),
-				StringValue: aws.String(v),
+				DataType:    new("String"),
+				StringValue: new(v),
 			}
 		}
 	}
