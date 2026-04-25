@@ -15,7 +15,9 @@ go get github.com/gasmod/gas-queue
 |---------|-----------------------------------|-----------------------------------|
 | SQS     | `github.com/gasmod/gas-queue/sqs` | Production (AWS SQS / ElasticMQ) |
 
-The SQS backend implements `gas.Service` and `gas.JobQueueProvider`.
+The SQS backend implements `gas.Service`, `gas.JobQueueProvider`, and
+`gas.ReadyReporter` (returns an error before `Init` and after `Close` so
+callers can drain traffic during graceful shutdown).
 
 ## Usage
 

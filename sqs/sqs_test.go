@@ -324,3 +324,33 @@ func TestNackClosed(t *testing.T) {
 		t.Errorf("got %v, want ErrClosed", err)
 	}
 }
+
+func TestCheckReadyNotInitialized(t *testing.T) {
+	t.Parallel()
+	ctor := New(WithConfig(DefaultConfig()))
+	svc := ctor(nil, gas.NewNopLogger()())
+
+	if err := svc.CheckReady(context.Background()); err == nil {
+		t.Fatal("CheckReady() = nil, want error before Init")
+	}
+}
+
+func TestCheckReadyAfterInit(t *testing.T) {
+	t.Parallel()
+	svc := newTestService(t, &mockSQSClient{})
+
+	if err := svc.CheckReady(context.Background()); err != nil {
+		t.Fatalf("CheckReady() = %v, want nil", err)
+	}
+}
+
+func TestCheckReadyAfterClose(t *testing.T) {
+	t.Parallel()
+	svc := newTestService(t, &mockSQSClient{})
+	_ = svc.Close()
+
+	err := svc.CheckReady(context.Background())
+	if !errors.Is(err, queue.ErrClosed) {
+		t.Errorf("got %v, want ErrClosed", err)
+	}
+}

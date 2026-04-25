@@ -31,7 +31,11 @@ import "github.com/gasmod/gas-queue/queuetest"
 |---------|------------------|-----------------|-----------------------------------|
 | SQS     | `gas-queue/sqs`  | `gas-queue-sqs` | Production (AWS SQS / ElasticMQ) |
 
-The SQS backend implements `gas.Service` and `gas.JobQueueProvider`.
+The SQS backend implements `gas.Service`, `gas.JobQueueProvider`, and
+`gas.ReadyReporter`. `CheckReady` returns an error before `Init` runs and
+after `Close` is called (wrapping `queue.ErrClosed`); otherwise it returns
+nil. The check is local-only — it does not call AWS — so readiness probes
+remain cheap and independent of regional SQS availability.
 
 ## JobQueueProvider Interface
 

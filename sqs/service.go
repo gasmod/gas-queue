@@ -43,6 +43,7 @@ type Service struct {
 
 var _ gas.Service = (*Service)(nil)
 var _ gas.JobQueueProvider = (*Service)(nil)
+var _ gas.ReadyReporter = (*Service)(nil)
 
 // Client returns the underlying *sqs.Client for advanced operations
 // beyond the JobQueueProvider interface (e.g. CreateQueue, PurgeQueue,
@@ -145,6 +146,18 @@ func (s *Service) createClient() error {
 	}
 
 	s.client = awssqs.NewFromConfig(awsCfg, sqsOpts...)
+	return nil
+}
+
+// CheckReady reports whether the service is ready to accept traffic.
+// Returns an error before Init has run or after Close has been called.
+func (s *Service) CheckReady(_ context.Context) error {
+	if s.client == nil {
+		return fmt.Errorf("%s: not initialized", s.Name())
+	}
+	if s.closed.Load() {
+		return queue.ErrClosed
+	}
 	return nil
 }
 
