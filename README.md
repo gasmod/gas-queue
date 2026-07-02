@@ -1,5 +1,7 @@
 # gas-queue
 
+[![Test](https://github.com/gasmod/gas-queue/actions/workflows/test.yml/badge.svg)](https://github.com/gasmod/gas-queue/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/gasmod/gas-queue.svg)](https://pkg.go.dev/github.com/gasmod/gas-queue) ![Go Version](https://img.shields.io/github/go-mod/go-version/gasmod/gas-queue) [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 Job queue service for the [Gas](https://github.com/gasmod/gas) ecosystem. Provides a `gas.JobQueueProvider` implementation
 backed by AWS SQS, plus a test mock for use in unit tests.
 
